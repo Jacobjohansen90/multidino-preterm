@@ -116,7 +116,7 @@ class PreTermDataset(Dataset):
                     var = sum(values) / len(values) if values else 0.0
                     var_name = '_'.join(var_name)
                         
-                var = torch.tensor([var])
+                var = torch.tensor([var], dtype=torch.float32)
                 #Check for a condition on the task
                 conditions = task_cfg.get('conditional') or []
                 cond = 1
