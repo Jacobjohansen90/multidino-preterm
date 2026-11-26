@@ -1,0 +1,110 @@
+info:
+  name: baseline 
+
+data:
+  train_path: /projects/users/data/UCPH/DeepFetal/projects/preterm/Data/dataset_v7/train.parquet
+  test_path: /projects/users/data/UCPH/DeepFetal/projects/preterm/Data/dataset_v7/test.parquet
+  batch_size: 128
+  folds: 5
+  workers: 32
+  ehr_data: []
+  img_data: [physical_delta_x, physical_delta_y, GA_at_scan]
+  segmentation: False
+  img_size: [224, 224]
+  oversample_ratio: sqrt #0 = No oversampling
+  remove: []
+
+tasks:
+  preterm:
+    - variable: GA_weeks
+      compute_metrics: True
+      metric_type: classification
+      tracking_metric: SensAtSpec
+      conditional: [[multi_birth, False]]
+      cutoffs: [34,37]
+      weights: 1 #List same length as cutoffs or int applied to all cutoffs
+      weights_multiplier: 1 #List same length as cutoffs or int applied to all cutoffs
+      distance_weight: 0.5
+      distance_window: 5 #Abs length from variable before max distance weight is applied.
+      label_smoothing_value: 1 #0 = No label smoothing
+      label_smoothing_window: 1 #Window around variable where label_smoothing is applied.
+      loss:
+        func: bce
+        pos_weight: 1
+        pos_multiplier: 1
+  
+  aux_tasks:
+    - variable: GA_weeks
+      compute_metrics: False
+      metric_type: regression
+      weights: 0.001
+      weights_multiplier: 1
+      mask_value: 0
+      loss:
+        func: l2
+
+
+
+training:
+  epochs: 40
+  vit_frozen_until: 10  #VIT is frozen until this epoch
+  ehr_frozen_until: 10 #EHR is frozen until this epoch
+  #Unfreezeing strategy. Unfreeze blocks_per_step every_n_epochs until top_n_blocks are unfrozen.
+  #blocks_per_step = -1, top_n_blocks = -1 is all layers immediately
+  #blocks_per_step = -1, top_n_blocks = N is top N layers immediately
+  blocks_per_step: -1 
+  every_n_epochs: 2
+  top_n_blocks: -1
+  
+auxiliary:
+  method: append
+
+model:
+  vit:
+    #weights_path: /projects/users/data/UCPH/DeepFetal/projects/preterm/other_models/weights/oversampled_vitb16_xfold.pth #VitB
+    #weights_path: /projects/users/data/UCPH/DeepFetal/projects/preterm/other_models/weights/oversampled_vitb16_512_xfold.pth #VitB
+    #weights_path: 'vitb16' #VitB from scratch
+    dropout: 0.2
+  
+  ehr:
+    weights_path: 
+    dropout: 0.2
+    
+  transforms:
+    vit_layer_dims: []
+    ehr_layer_dims: []
+    seg_channel_dims: []
+    dropout: 0.2
+
+  self_attention:
+    num_heads: 4
+    num_layers: 1
+    dropout: 0.2    
+
+  head:
+    layer_dims: []
+    dropout: 0.2
+    
+optimizer:
+  type: AdamW
+  lr1: 5e-5 #Used while ViT is frozen
+  lr2: 5e-6 #Used while ViT is unfrozen
+  lr_decay: 0.65
+  weight_decay: 1e-2
+
+  #AdamW
+  adamw_params: [0.9,0.999, 1e-8] #Beta1, Beta2, Epsilon
+  
+scheduler:
+  type: cosine_warmup
+  num_warmup_steps: 10
+  num_cycles: 1 #A multiplier for the cosine scheduler. 2 means two cycles over training
+  
+device:
+  type: cuda
+  
+unused:
+  segmentation:
+    loss: ['bce', 'dice']
+    weights: 0.25
+    foreground: [3]

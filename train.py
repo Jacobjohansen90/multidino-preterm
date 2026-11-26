@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Mar  4 09:41:00 2026
+
+@author: jacob
+"""
+#%%Imports
+from omegaconf import OmegaConf
+import torch
+from tqdm import tqdm
+
+from dataloader.dataloader import DataSplits
+from utils.model_utils import model_from_conf, update_freezing
+from utils.optim_loader import get_optimizer, get_cosine_schedule_with_warmup
+from utils.loss_utils import ModelLoss
+from utils.metrics import Metrics
+from utils.utils import setup
+
+import warnings
+warnings.filterwarnings("ignore", message="The image is already gray.")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchmetrics")
+
+#%%Load config and setup logger(s) 
+cfg = OmegaConf.load("/projects/users/data/UCPH/DeepFetal/projects/preterm/ultradino-preterm/confs/training_confs/append_tokens_vitb16.yaml")
+
+save_path = setup(cfg)
+
+#%% Load and train n folds of models
+
+Data = DataSplits(cfg, save_path + 'misc/')
+
+Loss = ModelLoss(cfg)
+metrics = Metrics(cfg, save_path)
+
+for fold in range(cfg.data.folds):
+    
+    TrainLoader, ValLoader, TestLoader = Data.get_split(fold, cfg)
+    
+    model = model_from_conf(cfg)
+
+    optimizer = get_optimizer(model, cfg)
+    scheduler = get_cosine_schedule_with_warmup(optimizer, cfg)
+    Loss.reset()
+
+    for epoch in range(cfg.training.epochs):
+        update_freezing(model, epoch, cfg)
+        model.train()
+
+        for data in tqdm(TrainLoader, desc='Training'):
+            optimizer.zero_grad()
+            outputs, _ = model(data)
+
+            loss = Loss(outputs, data)
+            loss.backward()
+            optimizer.step()
+            
+        train_loss = Loss.get_loss()
+        Loss.reset()
+
+        scheduler.step()
+        model.eval()
+        
+        with torch.no_grad():
+            for data in tqdm(ValLoader, desc='Validating'):
+                outputs, _ = model(data)
+                
+                metrics.update(outputs, data)
+                
+                loss = Loss(outputs, data)
+    
+            val_loss = Loss.get_loss()
+            Loss.reset()
+            
+            metrics.log_epoch(train_loss, val_loss)
+
+            torch.save(model.state_dict(), f"{save_path}/weights/fold_{fold}/{str(epoch+1).zfill(3)}.pth")        
+        Loss.update_weights()
+        
+    for i in range(metrics.tasks):
+        epoch = metrics.get_epoch()
+        epoch = str(epoch).zfill(3)
+        model.load_state_dict(torch.load(f"{save_path}/weights/fold_{fold}/{epoch}.pth", weights_only=True))
+        model.eval()
+        
+        with torch.no_grad():
+            for data in tqdm(TestLoader, desc=f"Testing task {i+1} / {metrics.tasks+1}"):
+                outputs, _ = model(data)                
+                metrics.update(outputs, data, test=True)
+                
+    metrics.log_fold()
+
+    metrics.reset()
+            
+metrics.log_model()
+
+
