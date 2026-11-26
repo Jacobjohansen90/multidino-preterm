@@ -14,10 +14,8 @@ def setup(cfg):
     if cfg.info.name is None:
         raise Exception("Model experiment must be named")
 
-    if len(cfg.tasks.preterm.cutoffs) == 1:
-        name = f"{cfg.info.name}_{cfg.tasks.preterm.cutoffs[0]}"
-    else:
-        name = f"{cfg.info.name}_multihead"
+    name = f"{cfg.info.name}"
+
     path = f"/projects/users/data/UCPH/DeepFetal/projects/preterm/training_runs/Running/{name}/"
 
     if cfg.info.name == "test":
