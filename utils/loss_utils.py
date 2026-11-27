@@ -164,7 +164,6 @@ class ModelLoss(torch.nn.Module):
             logits = outputs[task][var]['logits']
             labels = data['labels'][task][var].to(self.device)
             mask = data['masks'][task][var].to(self.device)
-            mask = mask.bool()
             temp_loss = self.loss_fns[task][var](logits, labels, mask)
             loss = loss + temp_loss
             self.task_loss[task]['loss'].append(temp_loss.item())

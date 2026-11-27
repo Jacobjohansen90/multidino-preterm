@@ -127,11 +127,14 @@ class Metrics():
         losses['train_loss'] = sum(value for key, value in losses.items() if key.startswith('train_loss_'))
         losses['val_loss'] = sum(value for key, value in losses.items() if key.startswith('val_loss_'))
         
-        for task, var, cutoff, _ in self.keys:
+        for task, var, cutoff, task_type in self.keys:
             df = pl.concat(self.dfs[task][var])
             metrics = {}
             preds = torch.tensor(df['preds'].to_numpy(), dtype=torch.float32)
-            labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
+            if task_type == 'classifcation':
+                labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.int32)
+            else:
+                labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
  
             for name, metric in self.metric_fns[task][var].items():
                 metric.reset()
@@ -280,7 +283,7 @@ class Metrics():
                 
                 test_metrics[pop] = {metric: {} for metric in self.metric_fns[task][var]}
                 for name, metric in self.metric_fns[task][var].items():
-                    res, ci_lower, ci_upper = self.calculate_metric(pop_df, name, metric, calculate_CI=True)
+                    res, ci_lower, ci_upper = self.calculate_metric(pop_df, name, metric, task_type, calculate_CI=True)
                     test_metrics[pop][name]['overall'] = res
                     test_metrics[pop][name]['ci_lower'] = ci_lower
                     test_metrics[pop][name]['ci_upper'] = ci_upper
@@ -312,8 +315,11 @@ class Metrics():
                 f.write(report)
                 
             
-    def calculate_metric(self, df, name, metric, calculate_CI=False):
-        labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
+    def calculate_metric(self, df, name, metric, task_type, calculate_CI=False):
+        if task_type == 'classification':
+            labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.int32)
+        else:
+            labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
         if name == 'AUC':
             preds = df['preds_normalized']
         elif name in ['Sensitivity', 'Specificity']:
