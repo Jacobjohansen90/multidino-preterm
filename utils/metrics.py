@@ -131,7 +131,7 @@ class Metrics():
             df = pl.concat(self.dfs[task][var])
             metrics = {}
             preds = torch.tensor(df['preds'].to_numpy(), dtype=torch.float32)
-            if task_type == 'classifcation':
+            if task_type == 'classification':
                 labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.int32)
             else:
                 labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
