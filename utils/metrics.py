@@ -119,10 +119,10 @@ class Metrics():
         losses = {}
 
         for loss_task in train_loss:
-            losses[f'train_loss_{loss_task}'] = np.average(train_loss[loss_task]['loss'],
-                                                           weights=train_loss[loss_task]['count'])
-            losses[f'val_loss_{loss_task}'] = np.average(val_loss[loss_task]['loss'],
-                                                         weights=val_loss[loss_task]['count'])
+            losses[f'train_loss_{loss_task}'] = round(np.average(train_loss[loss_task]['loss'],
+                                                                 weights=train_loss[loss_task]['count']), 3)
+            losses[f'val_loss_{loss_task}'] = round(np.average(val_loss[loss_task]['loss'],
+                                                               weights=val_loss[loss_task]['count']), 3)
         
         losses['train_loss'] = sum(value for key, value in losses.items() if key.startswith('train_loss_'))
         losses['val_loss'] = sum(value for key, value in losses.items() if key.startswith('val_loss_'))

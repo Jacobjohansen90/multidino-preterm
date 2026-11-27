@@ -74,7 +74,7 @@ for fold in range(cfg.data.folds):
             
             metrics.log_epoch(train_loss, val_loss)
 
-            torch.save(model.state_dict(), f"{save_path}/weights/fold_{fold}/{str(epoch+1).zfill(3)}.pth")        
+            torch.save(model.state_dict(), f"{save_path}/weights/fold_{fold}/{str(epoch).zfill(3)}.pth")        
         Loss.update_weights()
         
     for i in range(metrics.tasks):
