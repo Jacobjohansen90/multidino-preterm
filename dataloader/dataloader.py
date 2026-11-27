@@ -131,12 +131,12 @@ class PreTermDataset(Dataset):
                         name = f"{var_name}_{cutoff}"
                         labels[task][name] = var
                         if not cond or (data.get('GA_valid')//7 < cutoff):
-                            masks[task][name] = torch.tensor([0])
+                            masks[task][name] = torch.tensor([True])
                         else:
-                            masks[task][name] = torch.tensor([1])
+                            masks[task][name] = torch.tensor([False])
                 else:
                     labels[task][var_name] = var
-                    masks[task][var_name] = torch.tensor([int(cond)])
+                    masks[task][var_name] = torch.tensor([bool(cond)])
                         
         #Get patient identifier
         ID = data.get(self.ID_var)
@@ -159,8 +159,8 @@ class PreTermDataset(Dataset):
  
         #Prepare Image
         img_path = data.get('no_ocr_preprocessed_file_path')
-        img = Image.open(img_path)
-        # img = np.zeros((224,224))
+        # img = Image.open(img_path)
+        img = np.zeros((224,224))
         img = np.asarray(img, dtype=np.float32)
 
         h,w  = img.shape[:2]
