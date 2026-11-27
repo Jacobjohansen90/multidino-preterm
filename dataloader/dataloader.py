@@ -434,6 +434,8 @@ class DataSplits:
                 raise ValueError(f"{col}: contains {len(overlap_val)} overlaps in val/train. \n Examples: {list(overlap_val)[:10]}")
 
         norm_dict = {}
+        print(train_df['physical_delta_x'])
+        print(train_df['physical_delta_y'])
 
         for key in cfg.data.ehr_data + cfg.data.img_data:
             if isinstance(key, str):
@@ -446,7 +448,6 @@ class DataSplits:
                 var_name = '_'.join(key)
                 norm_dict[var_name] = train_df.select(pl.mean_horizontal([pl.col(k) for k in key])).to_series().mean()
           
-        print(norm_dict)
         if self.oversample_ratio != 0:
             pregnancies = train_df.group_by("CPR_CHILD").agg((pl.col("GA").min() // 7 < max(self.cutoffs)).alias("positive"))
             positives = pregnancies.filter(pl.col("positive"))
