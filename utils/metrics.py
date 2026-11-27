@@ -219,7 +219,7 @@ class Metrics():
             df = pl.concat(self.dfs[task][var])
 
             if task_type == 'classification':
-                df = df.with_columns((pl.col("preds") >= pl.col("threshold")).cast(pl.float32).alias("preds_binary"),
+                df = df.with_columns((pl.col("preds") >= pl.col("threshold")).cast(pl.Int32).alias("preds_binary"),
                                      (pl.col("preds") + 0.5 - pl.col("threshold")).clip(0, 1).alias("preds_normalized"))
             
             self.test_preds[task][var].append(df)

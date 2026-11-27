@@ -84,7 +84,7 @@ for fold in range(cfg.data.folds):
         model.eval()
         
         with torch.no_grad():
-            for data in tqdm(TestLoader, desc=f"Testing task {i+1} / {metrics.tasks+1}"):
+            for data in tqdm(TestLoader, desc=f"Testing task {i+1} / {metrics.tasks}"):
                 outputs, _ = model(data)                
                 metrics.update(outputs, data, test=True)
                 
