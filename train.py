@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torchmetrics")
 
 #%%Load config and setup logger(s) 
 cfg = OmegaConf.load("/projects/users/data/UCPH/DeepFetal/projects/preterm/multidino-preterm/confs/training_confs/append_tokens_vitb16.yaml")
-
+torch.set_float32_matmul_precision("high")
 save_path = setup(cfg)
 
 #%% Load and train n folds of models
@@ -88,10 +88,7 @@ for fold in range(cfg.data.folds):
                 outputs, _ = model(data)                
                 metrics.update(outputs, data, test=True)
                 
-    metrics.log_fold()
-
-    metrics.reset()
-            
+    metrics.log_fold()            
 metrics.log_model()
 
 

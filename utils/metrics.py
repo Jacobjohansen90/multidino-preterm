@@ -263,13 +263,13 @@ class Metrics():
 
                 #Get overall metric
                 for name, metric in self.metric_fns[task][var].items():
-                    val_metrics[pop]['overall'][name] = self.calculate_metric(pop_df, name, metric)
+                    val_metrics[pop]['overall'][name] = self.calculate_metric(pop_df, name, metric, task_type)
                     
                 #Get fold level metrics
                 for fold in pop_df['fold'].unique().to_list():
                     fold_df = pop_df.filter(pl.col('fold') == fold)
                     for name, metric in self.metric_fns[task][var].items():
-                        val_metrics[pop]['folds'][name].append(self.calculate_metric(fold_df, name, metric))
+                        val_metrics[pop]['folds'][name].append(self.calculate_metric(fold_df, name, metric, task_type))
 
             self.plot_fold_variability(val_metrics, f"{task} - {var}")
 
@@ -320,7 +320,7 @@ class Metrics():
             labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.int32)
         else:
             labels = torch.tensor(df['labels'].to_numpy(), dtype=torch.float32)
-        if name == 'AUC':
+        if name == ['AUC', 'SensAtSpec']:
             preds = df['preds_normalized']
         elif name in ['Sensitivity', 'Specificity']:
             preds = df['preds_binary']
@@ -332,13 +332,13 @@ class Metrics():
         result = output[0].item() if isinstance(output, tuple) else output.item()
         
         if calculate_CI:
-            ci_lower, ci_upper = self.calculate_CI(df, name, metric)
+            ci_lower, ci_upper = self.calculate_CI(df, name, metric, task_type)
             return result, ci_lower, ci_upper
         else:
             return result
     
     
-    def calculate_CI(self, df, name, metric):
+    def calculate_CI(self, df, name, metric, task_type):
         rng = np.random.default_rng()
         bootstrap_metrics = []
         counter = 0
@@ -355,7 +355,7 @@ class Metrics():
             if bootstrap_df['labels'].sum() == 0 or bootstrap_df['labels'].sum() == bootstrap_df.height:
                 continue
             
-            result = self.calculate_metric(bootstrap_df, name, metric)
+            result = self.calculate_metric(bootstrap_df, name, metric, task_type)
             bootstrap_metrics.append(result)
         
         ci_lower, ci_upper = np.percentile(bootstrap_metrics, [2.5, 97.5])

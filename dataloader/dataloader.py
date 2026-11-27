@@ -20,7 +20,7 @@ FUS13M_MEAN = 0.1842924807
 FUS13M_STD = 0.2187705424
         
 class PreTermDataset(Dataset):
-    def __init__(self, df, cfg, train, max_images, ID='CPR_CHILD'):
+    def __init__(self, df, cfg, train, max_images, normalization_dict, ID='CPR_CHILD'):
 
         super().__init__()
         self.img_size = cfg.data.img_size
@@ -31,6 +31,7 @@ class PreTermDataset(Dataset):
         self.train = train
         self.setup_transforms()
         self.ID_var = ID
+        self.normalization_dict = normalization_dict
         self.get_segs = 'segmentation' in cfg.tasks.keys() or cfg.data.segmentation
         self.remove = cfg.data.remove
         self.max_images = max_images
@@ -52,13 +53,13 @@ class PreTermDataset(Dataset):
         
     def setup_transforms(self):
         if self.train:
-            self.transforms = A.Compose([A.RandomBrightnessContrast(brightness_limit=(-0.3, 0.3), contrast_limit=(-0.3, 0.3), p=0.15),
+            self.transforms = A.Compose([A.Resize(height=self.img_size[0], width=self.img_size[1]),
+                                         A.RandomBrightnessContrast(brightness_limit=(-0.3, 0.3), contrast_limit=(-0.3, 0.3), p=0.15),
                                          A.RandomGamma(gamma_limit=(80, 120), p=0.15),
                                          A.GaussNoise(std_range=(0.05, 0.2), p=0.15),
                                          #A.GridDistortion(num_steps=5, distort_limit=(-0.3, 0.3), p=0.5),
                                          A.HorizontalFlip(p=0.5),
                                          A.VerticalFlip(p=0.5),
-                                         A.Resize(height=self.img_size[0], width=self.img_size[1]), #move this up
                                          A.ToGray(p=1.0, num_output_channels=1),
                                          A.Normalize(mean=self.norm_mean, std=self.norm_std),
                                          A.ToTensorV2()])
@@ -87,10 +88,12 @@ class PreTermDataset(Dataset):
                 if key.lower() == 'treatment':
                     ehr_data.append(treatment)
                 else:
-                    ehr_data.append(float(data.get(key) or 0.0))
+                    ehr_data.append(float(data.get(key) or 0.0) / self.normalization_dict[key])
             else:
+                var_name = '_'.join(key)
                 values = [float(data[k]) for k in key if data.get(k) is not None]
-                ehr_data.append(sum(values) / len(values) if values else 0.0)
+                value = sum(values) / len(values) if values else 0.0
+                ehr_data.append(value / self.normalization_dict[var_name])
 
         ehr_data = torch.tensor(ehr_data)
                 
@@ -131,9 +134,9 @@ class PreTermDataset(Dataset):
                         name = f"{var_name}_{cutoff}"
                         labels[task][name] = var
                         if not cond or (data.get('GA_valid')//7 < cutoff):
-                            masks[task][name] = torch.tensor([True])
-                        else:
                             masks[task][name] = torch.tensor([False])
+                        else:
+                            masks[task][name] = torch.tensor([True])
                 else:
                     labels[task][var_name] = var
                     masks[task][var_name] = torch.tensor([bool(cond)])
@@ -159,9 +162,9 @@ class PreTermDataset(Dataset):
  
         #Prepare Image
         img_path = data.get('no_ocr_preprocessed_file_path')
-        # img = Image.open(img_path)
-        img = np.zeros((224,224))
-        img = np.asarray(img, dtype=np.float32)
+        img = Image.open(img_path)
+        # img = np.zeros((224,224))
+        img = np.asarray(img)
 
         h,w  = img.shape[:2]
 
@@ -174,9 +177,13 @@ class PreTermDataset(Dataset):
             data_temp = data.get(key) or 0.0
             #Correct physical deltas    
             if key == 'physical_delta_x' and data_temp != 0:
-                data_temp = (w/self.img_size[1]) * data_temp[0]
+                data_temp = data_temp[0] / self.normalization_dict[key]
+                data_temp = (w/self.img_size[1]) * data_temp
             elif key == 'physical_delta_y' and data_temp != 0:
-                data_temp = (h/self.img_size[0]) * data_temp[0]
+                data_temp = data_temp[0] / self.normalization_dict[key]
+                data_temp = (h/self.img_size[0]) * data_temp
+            else:
+                data_temp = data_temp / self.normalization_dict[key]
             
             img_data.append(data_temp)
         
@@ -423,10 +430,22 @@ class DataSplits:
             if overlap_val:
                 raise ValueError(f"{col}: contains {len(overlap_val)} overlaps in val/train. \n Examples: {list(overlap_val)[:10]}")
 
+        norm_dict = {}
+
+        for key in cfg.data.ehr_data + cfg.data.img_data:
+            if isinstance(key, str):
+                if key.lower() == 'treatment':
+                    continue
+        
+                norm_dict[key] = train_df[key].mean()
+        
+            else:
+                var_name = '_'.join(key)
+                norm_dict[var_name] = train_df.select(pl.mean_horizontal([pl.col(k) for k in key])).to_series().mean()
             
         if self.oversample_ratio != 0:
             pregnancies = train_df.group_by("CPR_CHILD").agg((pl.col("GA").min() // 7 < max(self.cutoffs)).alias("positive"))
-            
+            print(train_df.height)
             positives = pregnancies.filter(pl.col("positive"))
             negatives = pregnancies.filter(~pl.col("positive"))
             
@@ -455,16 +474,17 @@ class DataSplits:
                 sampled_ids = pl.concat([pregnancies.select("CPR_CHILD"), extra.select("CPR_CHILD")])
                 
                 train_df = sampled_ids.join(train_df, on="CPR_CHILD", how="left")
-        
+                print(train_df.height)
+
         if (cfg.data.batch_size % 4) != 0:
             print(f"Batch size not divisible by 4. Changing it from {cfg.data.batch_size} to {cfg.data.batch_size - (cfg.data.batch_size % 4)}")
         
         batch_size = cfg.data.batch_size - (cfg.data.batch_size % 4)
         val_test_batch_size = batch_size // 4
         
-        TrainData = PreTermDataset(train_df, cfg, train=True, max_images=batch_size)
-        ValData = PreTermDataset(val_df, cfg, train=False, max_images=val_test_batch_size)
-        TestData = PreTermDataset(test_df, cfg, train=False, max_images=val_test_batch_size)       
+        TrainData = PreTermDataset(train_df, cfg, train=True, max_images=batch_size, normalization_dict=norm_dict)
+        ValData = PreTermDataset(val_df, cfg, train=False, max_images=val_test_batch_size, normalization_dict=norm_dict)
+        TestData = PreTermDataset(test_df, cfg, train=False, max_images=val_test_batch_size, normalization_dict=norm_dict)       
         
         TrainBatchSampler = PregnancyBatchSampler(TrainData.image_counts, batch_size, shuffle=True)
 

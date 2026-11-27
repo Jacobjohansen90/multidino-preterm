@@ -75,10 +75,10 @@ def decay_lr(model, base_lr, lr_decay, weight_decay):
         layer_id = get_layer_id(name, n_layers)
         scale = lr_decay ** (n_layers - layer_id)
 
-        if param.ndim != 1 and name.endswith('.weight'):
+        if param.ndim != 1 and name.endswith('weight'):
             wd = weight_decay
         else:
-            wd = 1.0
+            wd = 0.0
 
         param_groups.append({"params": [param],
                              "lr": base_lr * scale,
