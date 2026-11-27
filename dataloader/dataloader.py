@@ -434,15 +434,15 @@ class DataSplits:
                 raise ValueError(f"{col}: contains {len(overlap_val)} overlaps in val/train. \n Examples: {list(overlap_val)[:10]}")
 
         norm_dict = {}
-        print(train_df['physical_delta_x'])
-        print(train_df['physical_delta_y'].mean())
 
         for key in cfg.data.ehr_data + cfg.data.img_data:
             if isinstance(key, str):
                 if key.lower() == 'treatment':
                     continue
-        
-                norm_dict[key] = train_df[key].mean()
+                if key in ['physical_delta_x', 'physical_delta_y']:
+                    norm_dict[key] = train_df[key].list.first().mean()
+                else:
+                    norm_dict[key] = train_df[key].mean()
         
             else:
                 var_name = '_'.join(key)
