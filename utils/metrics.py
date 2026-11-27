@@ -85,9 +85,11 @@ class Metrics():
                 labels = data['labels'][task][var]
                 if cutoff is not None:
                     labels = labels < cutoff
-    
+                #Make img_paths pregnancy level
+                img_paths = [[path for path, idx in zip(data['img_paths'], data['pregnancy_indices'].cpu().numpy()) if idx == i]
+                             for i in range(len(data['IDs']))]
                 df = pl.DataFrame({'CPR_CHILD': data['IDs'],
-                                   'img_path': data['img_paths'],
+                                   'img_paths': img_paths,
                                    'preds': outputs[task][var]['preds'].flatten().cpu().numpy(),
                                    'labels': labels.flatten().cpu().numpy(),
                                    'treatment': data['treatment'],
@@ -100,8 +102,11 @@ class Metrics():
             labels = data['labels'][task][var]
             if cutoff is not None:
                 labels = labels < cutoff
+            #Make img_paths pregnancy level
+            img_paths = [[path for path, idx in zip(data['img_paths'], data['pregnancy_indices'].cpu().numpy()) if idx == i]
+                         for i in range(len(data['IDs']))]
             df = pl.DataFrame({'CPR_CHILD': data['IDs'],
-                               'img_path': data['img_paths'],
+                               'img_paths': img_paths,
                                'preds': outputs[task][var]['preds'].flatten().cpu().numpy(),
                                'labels': labels.flatten().cpu().numpy(),
                                'treatment': data['treatment'],

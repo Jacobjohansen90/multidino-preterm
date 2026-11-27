@@ -159,8 +159,8 @@ class PreTermDataset(Dataset):
  
         #Prepare Image
         img_path = data.get('no_ocr_preprocessed_file_path')
-        img = Image.open(img_path)
-        # img = np.zeros((224,224))
+        # img = Image.open(img_path)
+        img = np.zeros((224,224))
         img = np.asarray(img, dtype=np.float32)
 
         h,w  = img.shape[:2]
