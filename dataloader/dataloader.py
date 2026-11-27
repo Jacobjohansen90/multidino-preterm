@@ -42,7 +42,10 @@ class PreTermDataset(Dataset):
                      (pl.col('c-section') & (pl.col('c-section_during_birth') |
                                              pl.col('contractions_with_preterm_birth')) &
                       ~pl.col('induced')))
-
+        
+        for var in cfg.data.remove:  
+            df = df.filter(~pl.col(var))
+        
         self.df = df.with_columns(pl.when(condition).then(1000).otherwise(pl.col('GA')).alias('GA_valid'))
                             
         self.groups = (self.df.with_row_index("img_idx").group_by(ID, maintain_order=True).agg(pl.col("img_idx")))
@@ -442,10 +445,10 @@ class DataSplits:
             else:
                 var_name = '_'.join(key)
                 norm_dict[var_name] = train_df.select(pl.mean_horizontal([pl.col(k) for k in key])).to_series().mean()
-            
+          
+        print(norm_dict)
         if self.oversample_ratio != 0:
             pregnancies = train_df.group_by("CPR_CHILD").agg((pl.col("GA").min() // 7 < max(self.cutoffs)).alias("positive"))
-            print(train_df.height)
             positives = pregnancies.filter(pl.col("positive"))
             negatives = pregnancies.filter(~pl.col("positive"))
             
@@ -474,7 +477,6 @@ class DataSplits:
                 sampled_ids = pl.concat([pregnancies.select("CPR_CHILD"), extra.select("CPR_CHILD")])
                 
                 train_df = sampled_ids.join(train_df, on="CPR_CHILD", how="left")
-                print(train_df.height)
 
         if (cfg.data.batch_size % 4) != 0:
             print(f"Batch size not divisible by 4. Changing it from {cfg.data.batch_size} to {cfg.data.batch_size - (cfg.data.batch_size % 4)}")
