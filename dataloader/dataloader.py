@@ -435,7 +435,7 @@ class DataSplits:
 
         norm_dict = {}
         print(train_df['physical_delta_x'])
-        print(train_df['physical_delta_y'])
+        print(train_df['physical_delta_y'].mean())
 
         for key in cfg.data.ehr_data + cfg.data.img_data:
             if isinstance(key, str):
